@@ -34,21 +34,15 @@ class Entity {
     });
   }
 
-  placeDialogueBox(size) {
-    let best = layout.placeBox(this.box, size);
-    if (best) {
-      drawBox(best, this.id, {
-        background: '#222222dd',
-        color: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        fontFamily: 'monospace',
-      });
-      layout.add(best);
-    } else {
-      throw Error("Should have been a best box");
-    }
+  renderDialogueBox(rect) {
+    drawBox(rect, this.id, {
+      background: '#222222dd',
+      color: '#ffffff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      fontFamily: 'monospace',
+    });
   }
 }
 
@@ -95,9 +89,30 @@ const entities = boxes.map((box, i) => {
 });
 
 // Place offscreen first, as they have more restrictive requirements
-entities.filter((entity) => layout.isOffscreen(entity.box)).forEach((entity) => {
-  entity.placeDialogueBox({w: 140, h: 30});
+const results = [];
+const boxSize = {w: 140, h: 30};
+
+const onscreen = entities.filter((entity) => !layout.isOffscreen(entity.box));
+const offscreen = entities.filter((entity) => layout.isOffscreen(entity.box));
+layout.placeOffscreen(offscreen, offscreen.map(() => boxSize)).forEach((pos, i) => {
+  let rect = {
+    x: pos.x,
+    y: pos.y,
+    w: boxSize.w,
+    h: boxSize.h,
+  };
+  offscreen[i].renderDialogueBox(rect);
+  results.push(rect);
+  layout.add(rect);
 });
-entities.filter((entity) => !layout.isOffscreen(entity.box)).forEach((entity) => {
-  entity.placeDialogueBox({w: 140, h: 30});
+onscreen.forEach((entity) => {
+  let rect = layout.placeOnscreen(entity.box, boxSize);
+  entity.renderDialogueBox(rect);
+  results.push(rect);
+  layout.add(rect);
+});
+
+// Use for testing in Godot
+results.forEach((box) => {
+  console.log(`Vector2(${box.x}, ${box.y})`);
 });

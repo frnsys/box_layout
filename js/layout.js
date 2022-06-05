@@ -33,15 +33,7 @@ class Layout {
       || (box.y >= this.stage.clientHeight)
   }
 
-  placeBox(host, size) {
-    if (this.isOffscreen(host)) {
-      return this._placeOffscreen(host, size);
-    } else {
-      return this._placeOnscreen(host, size);
-    }
-  }
-
-  _placeOnscreen(host, size) {
+  placeOnscreen(host, size) {
     const rankings = [];
     for (let anch of ANCHORS) {
       const anchPos = anchor(host, anch);
@@ -82,42 +74,83 @@ class Layout {
     return best.box;
   }
 
-  _placeOffscreen(host, size) {
-    let best = {
-      x: host.x,
-      y: host.y,
-      w: size.w,
-      h: size.h,
-    }
+  placeOffscreen(hosts, sizes) {
+    const sides = {
+      left: [],
+      right: [],
+      top: [],
+      bottom: [],
+    };
 
-    let offscreenX = false;
-    if (best.x < 0) {
-      best.x = 0;
-      offscreenX = true;
-    } else if (best.x >= this.stage.clientWidth) {
-      best.x = this.stage.clientWidth - size.w;
-      offscreenX = true;
-    }
+    hosts.forEach((host, i) => {
+      if (host.box.x < 0) {
+        sides.left.push(i);
+      } else if (host.box.x >= stage.clientWidth) {
+        sides.right.push(i);
+      } else if (host.box.y < 0) {
+        sides.top.push(i);
+      } else if (host.box.y >= stage.clientHeight) {
+        sides.bottom.push(i);
+      }
+    });
 
-    let offscreenY = false;
-    if (best.y < 0) {
-      best.y = 0;
-      offscreenY = true;
-    } else if (best.y >= this.stage.clientHeight) {
-      best.y = this.stage.clientHeight - size.h;
-      offscreenY = true;
-    }
+    const positions = Array(hosts.length);
+    Object.entries(sides).forEach(([side, indices]) => {
+      if (indices.length == 0) return;
 
-    let tries = [];
-    if (offscreenX) {
-      tries.push(host.y + host.h/2 - best.h/2);
-      tries.push(host.y + host.h - best.h);
-    }
-    while (!this.hasNoOverlaps(best) && tries.length > 0) {
-      let y = tries.pop();
-      best.y = y;
-    }
-    return best;
+      if (side == 'left' || side == 'right') {
+        // Sort from top to bottom
+        indices.sort((a, b) => hosts[a].box.y - hosts[b].box.y);
+
+        let minHeight = 0;
+        for (const i of indices) {
+            minHeight += sizes[i].h
+        }
+
+        let i = indices.shift();
+        let pos = {
+          x: side == 'right' ? stage.clientWidth - sizes[i].w : 0,
+          y: Math.min(hosts[i].box.y, stage.clientHeight - minHeight)
+        };
+        let end = pos.y + sizes[i].h;
+        positions[i] = pos;
+        indices.forEach((i) => {
+          let pos = {
+            x: side == 'right' ? stage.clientWidth - sizes[i].w : 0,
+            y: Math.min(stage.clientHeight - sizes[i].h, Math.max(hosts[i].box.y, end))
+          };
+          end = pos.y + sizes[i].h;
+          positions[i] = pos;
+        });
+
+      } else {
+        // Sort from left to right
+        indices.sort((a, b) => hosts[a].box.x - hosts[b].box.x);
+
+        let minWidth = 0;
+        for (const i of indices) {
+            minWidth += sizes[i].w
+        }
+
+        let i = indices.shift();
+        let pos = {
+          x: Math.min(hosts[i].box.x, stage.clientWidth - minWidth),
+          y: side == 'top' ? 0 : stage.clientHeight - sizes[i].h,
+        };
+        let end = pos.x + sizes[i].w
+        positions[i] = pos;
+        indices.forEach((i) => {
+          let pos = {
+            x: Math.min(stage.clientWidth - sizes[i].w, Math.max(hosts[i].box.x, end)),
+            y: side == 'top' ? 0 : stage.clientHeight - sizes[i].h,
+          };
+          end = pos.x + sizes[i].w
+          positions[i] = pos;
+        });
+      }
+    });
+
+    return positions;
   }
 }
 
